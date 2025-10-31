@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NYU Study Room Booking</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 2.5em;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .booking-form {
+      background: #f8f9fa;
+      padding: 30px;
+      border-radius: 15px;
+      margin-bottom: 40px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 40px;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+    .bookings-list {
+      margin-top: 40px;
+    }
+    .booking-card {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-left: 5px solid #667eea;
+    }
+    .booking-info h3 {
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .booking-info p {
+      color: #666;
+      font-size: 14px;
+    }
+    .delete-btn {
+      background: #e74c3c;
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+    .delete-btn:hover {
+      background: #c0392b;
+    }
+    .error {
+      background: #fee;
+      color: #c00;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .success {
+      background: #efe;
+      color: #060;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📚 NYU Study Room Booking</h1>
+    <p class="subtitle">Book study pods with your @nyu.edu email</p>
+    
+    <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
+    
+    <div class="booking-form">
+      <h2>Create New Booking</h2>
+      <div class="form-group">
+        <label>Your NYU Email</label>
+        <input type="email" id="userEmail" placeholder="netid@nyu.edu" required>
+      </div>
+      <div class="form-group">
+        <label>Study Room</label>
+        <select id="roomName">
+          <option value="Study Room LC416">Study Room LC416</option>
+          <option value="Study Room LC417">Study Room LC417</option>
+          <option value="Study Room LC418">Study Room LC418</option>
+          <option value="Study Room LC419">Study Room LC419</option>
+          <option value="Study Room LC420">Study Room LC420</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Start Time</label>
+        <input type="datetime-local" id="startTime" required>
+      </div>
+      <div class="form-group">
+        <label>Duration (minutes)</label>
+        <select id="duration">
+          <option value="30">30 minutes</option>
+          <option value="60">1 hour</option>
+          <option value="90">1.5 hours</option>
+          <option value="120">2 hours</option>
+        </select>
+      </div>
+      <button onclick="createBooking()">Book Room</button>
+    </div>
+    
+    <div class="bookings-list">
+      <h2>Current Bookings</h2>
+      <div id="bookingsList"></div>
+    </div>
+  </div>
+
+  <script>
+    // Load bookings when page loads
+    loadBookings();
+
+    async function createBooking() {
+      const userEmail = document.getElementById('userEmail').value;
+      const roomName = document.getElementById('roomName').value;
+      const startTime = document.getElementById('startTime').value;
+      const duration = parseInt(document.getElementById('duration').value);
+
+      if (!userEmail.endsWith('@nyu.edu')) {
+        showError('Please use your @nyu.edu email');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail, roomName, startTime, duration })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          showError(error.error);
+          return;
+        }
+
+        showSuccess('Booking created successfully!');
+        loadBookings();
+      } catch (err) {
+        showError('Failed to create booking');
+      }
+    }
+
+    async function loadBookings() {
+      try {
+        const response = await fetch('/api/bookings');
+        const bookings = await response.json();
+        
+        const listEl = document.getElementById('bookingsList');
+        listEl.innerHTML = '';
+
+        bookings.forEach(booking => {
+          const start = new Date(booking.start.dateTime);
+          const end = new Date(booking.end.dateTime);
+          const bookedBy = booking.extendedProperties?.private?.bookedBy || 'Unknown';
+
+          const card = document.createElement('div');
+          card.className = 'booking-card';
+          card.innerHTML = `
+            <div class="booking-info">
+              <h3>${booking.summary}</h3>
+              <p>${start.toLocaleString()} - ${end.toLocaleTimeString()}</p>
+              <p><strong>Booked by:</strong> ${bookedBy}</p>
+            </div>
+            <button class="delete-btn" onclick="deleteBooking('${booking.id}', '${bookedBy}')">Cancel</button>
+          `;
+          listEl.appendChild(card);
+        });
+      } catch (err) {
+        showError('Failed to load bookings');
+      }
+    }
+
+    async function deleteBooking(eventId, bookedBy) {
+      const userEmail = prompt('Enter your @nyu.edu email to confirm cancellation:');
+      
+      if (!userEmail) return;
+      
+      try {
+        const response = await fetch(`/api/bookings/${eventId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          showError(error.error);
+          return;
+        }
+
+        showSuccess('Booking cancelled successfully!');
+        loadBookings();
+      } catch (err) {
+        showError('Failed to cancel booking');
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 5000);
+    }
+
+    function showSuccess(msg) {
+      const el = document.getElementById('success');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 5000);
+    }
+  </script>
+</body>
+</html>
