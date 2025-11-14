@@ -29,6 +29,7 @@ app.get("/api/bookings", async (req, res) => {
 });
 
 // Create a new booking
+// Create a new booking
 app.post("/api/bookings", async (req, res) => {
   try {
     const { roomName, startTime, duration, userEmail } = req.body;
@@ -38,14 +39,18 @@ app.post("/api/bookings", async (req, res) => {
       return res.status(403).json({ error: "Must use @nyu.edu email" });
     }
     
-    const start = new Date(startTime);
-    const end = new Date(start.getTime() + duration * 60 * 1000); // duration in minutes
+    // Treat the datetime-local input as Eastern Time
+    // Add timezone offset for New York (EST is -05:00, EDT is -04:00)
+    // For now using -05:00 (you may need -04:00 during daylight saving)
+    const startWithTZ = startTime + ":00-05:00";
+    const startDate = new Date(startWithTZ);
+    const endDate = new Date(startDate.getTime() + duration * 60 * 1000);
     
     const booking = await createBooking(
       `${roomName} - Booked`,
       `Study room booking`,
-      start.toISOString(),
-      end.toISOString(),
+      startDate.toISOString(),
+      endDate.toISOString(),
       userEmail
     );
     
