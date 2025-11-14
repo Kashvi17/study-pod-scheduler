@@ -114,7 +114,7 @@ const checkConflict = async (roomName, startTime, endTime) => {
 };
 
 // Auto-cancel bookings if no show (15+ minutes past start time)
-const autoCancel NoShows = async () => {
+const autoCancelNoShows = async () => {
   try {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
