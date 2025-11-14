@@ -1,6 +1,7 @@
 // server.js
 const express = require("express");
 const path = require("path");
+const moment = require("moment-timezone"); // Add this line
 const { createBooking, getBookings, deleteBooking } = require("./google_calendar");
 require("dotenv").config();
 
@@ -30,6 +31,7 @@ app.get("/api/bookings", async (req, res) => {
 
 // Create a new booking
 // Create a new booking
+// Create a new booking
 app.post("/api/bookings", async (req, res) => {
   try {
     const { roomName, startTime, duration, userEmail } = req.body;
@@ -39,18 +41,16 @@ app.post("/api/bookings", async (req, res) => {
       return res.status(403).json({ error: "Must use @nyu.edu email" });
     }
     
-    // Treat the datetime-local input as Eastern Time
-    // Add timezone offset for New York (EST is -05:00, EDT is -04:00)
-    // For now using -05:00 (you may need -04:00 during daylight saving)
-    const startWithTZ = startTime + ":00-05:00";
-    const startDate = new Date(startWithTZ);
-    const endDate = new Date(startDate.getTime() + duration * 60 * 1000);
+    // The browser sends datetime-local as "2025-11-14T17:35" (no timezone)
+    // We need to interpret this AS New York time, not convert TO New York time
+    const startMoment = moment.tz(startTime, "America/New_York");
+    const endMoment = startMoment.clone().add(duration, 'minutes');
     
     const booking = await createBooking(
       `${roomName} - Booked`,
       `Study room booking`,
-      startDate.toISOString(),
-      endDate.toISOString(),
+      startMoment.toISOString(),
+      endMoment.toISOString(),
       userEmail
     );
     

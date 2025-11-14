@@ -15,30 +15,15 @@ const calendar = google.calendar({ version: "v3", auth });
 // Create a booking
 const createBooking = async (summary, description, startTime, endTime, userEmail) => {
   try {
-    // Parse the ISO strings
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    
-    // Format as YYYY-MM-DDTHH:MM:SS for NY timezone
-    const formatForNY = (date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      const seconds = String(date.getSeconds()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-    };
-    
     const event = {
       summary,
       description: `${description}\n\nBooked by: ${userEmail}`,
       start: { 
-        dateTime: formatForNY(start),
+        dateTime: startTime,
         timeZone: "America/New_York"
       },
       end: { 
-        dateTime: formatForNY(end),
+        dateTime: endTime,
         timeZone: "America/New_York"
       },
       extendedProperties: {
