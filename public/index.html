@@ -84,6 +84,10 @@
       align-items: center;
       border-left: 5px solid #667eea;
     }
+    .booking-card.expired {
+      opacity: 0.6;
+      border-left-color: #e74c3c;
+    }
     .booking-info h3 {
       color: #333;
       margin-bottom: 5px;
@@ -116,6 +120,11 @@
       margin-bottom: 20px;
       display: none;
     }
+    .helper-text {
+      font-size: 13px;
+      color: #666;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -133,13 +142,17 @@
         <input type="email" id="userEmail" placeholder="netid@nyu.edu" required>
       </div>
       <div class="form-group">
+        <label>Your N Number</label>
+        <input type="text" id="nNumber" placeholder="N12345678" required maxlength="9">
+        <div class="helper-text">Enter your 9-character N number (e.g., N12345678)</div>
+      </div>
+      <div class="form-group">
         <label>Study Room</label>
         <select id="roomName">
-          <option value="Study Room LC416">Study Room LC416</option>
-          <option value="Study Room LC417">Study Room LC417</option>
-          <option value="Study Room LC418">Study Room LC418</option>
-          <option value="Study Room LC419">Study Room LC419</option>
-          <option value="Study Room LC420">Study Room LC420</option>
+          <option value="Room 3A">Room 3A</option>
+          <option value="Room 3B">Room 3B</option>
+          <option value="Room 4A">Room 4A</option>
+          <option value="Room 4B">Room 4B</option>
         </select>
       </div>
       <div class="form-group">
@@ -167,15 +180,34 @@
   <script>
     // Load bookings when page loads
     loadBookings();
+    
+    // Auto-refresh bookings every 30 seconds
+    setInterval(loadBookings, 30000);
 
     async function createBooking() {
       const userEmail = document.getElementById('userEmail').value;
+      const nNumber = document.getElementById('nNumber').value.trim().toUpperCase();
       const roomName = document.getElementById('roomName').value;
       const startTime = document.getElementById('startTime').value;
       const duration = parseInt(document.getElementById('duration').value);
 
+      // Validate email
       if (!userEmail.endsWith('@nyu.edu')) {
         showError('Please use your @nyu.edu email');
+        return;
+      }
+
+      // Validate N number format
+      if (!/^N\d{8}$/.test(nNumber)) {
+        showError('N number must be in format N12345678 (N followed by 8 digits)');
+        return;
+      }
+
+      // Validate start time is not in the past
+      const now = new Date();
+      const selectedTime = new Date(startTime);
+      if (selectedTime < now) {
+        showError('Cannot book a room in the past');
         return;
       }
 
@@ -183,7 +215,7 @@
         const response = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userEmail, roomName, startTime, duration })
+          body: JSON.stringify({ userEmail, nNumber, roomName, startTime, duration })
         });
 
         if (!response.ok) {
@@ -193,6 +225,7 @@
         }
 
         showSuccess('Booking created successfully!');
+        document.getElementById('startTime').value = '';
         loadBookings();
       } catch (err) {
         showError('Failed to create booking');
@@ -207,20 +240,32 @@
         const listEl = document.getElementById('bookingsList');
         listEl.innerHTML = '';
 
+        if (bookings.length === 0) {
+          listEl.innerHTML = '<p style="color: #666;">No bookings found</p>';
+          return;
+        }
+
+        const now = new Date();
+
         bookings.forEach(booking => {
           const start = new Date(booking.start.dateTime);
           const end = new Date(booking.end.dateTime);
           const bookedBy = booking.extendedProperties?.private?.bookedBy || 'Unknown';
+          
+          // Check if booking is expired (more than 15 min past start time)
+          const fifteenMinAfterStart = new Date(start.getTime() + 15 * 60 * 1000);
+          const isExpired = now > fifteenMinAfterStart && now < end;
 
           const card = document.createElement('div');
-          card.className = 'booking-card';
+          card.className = 'booking-card' + (isExpired ? ' expired' : '');
           card.innerHTML = `
             <div class="booking-info">
               <h3>${booking.summary}</h3>
               <p>${start.toLocaleString()} - ${end.toLocaleTimeString()}</p>
               <p><strong>Booked by:</strong> ${bookedBy}</p>
+              ${isExpired ? '<p style="color: #e74c3c; font-weight: bold;">⚠️ Auto-cancellation pending (no show)</p>' : ''}
             </div>
-            <button class="delete-btn" onclick="deleteBooking('${booking.id}', '${bookedBy}')">Cancel</button>
+            <button class="delete-btn" onclick="deleteBooking('${booking.id}')">Cancel</button>
           `;
           listEl.appendChild(card);
         });
@@ -229,16 +274,24 @@
       }
     }
 
-    async function deleteBooking(eventId, bookedBy) {
-      const userEmail = prompt('Enter your @nyu.edu email to confirm cancellation:');
+    async function deleteBooking(eventId) {
+      const nNumber = prompt('Enter your N number to confirm cancellation (e.g., N12345678):');
       
-      if (!userEmail) return;
+      if (!nNumber) return;
+      
+      const formattedNNumber = nNumber.trim().toUpperCase();
+      
+      // Validate N number format
+      if (!/^N\d{8}$/.test(formattedNNumber)) {
+        showError('N number must be in format N12345678 (N followed by 8 digits)');
+        return;
+      }
       
       try {
         const response = await fetch(`/api/bookings/${eventId}`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userEmail })
+          body: JSON.stringify({ nNumber: formattedNNumber })
         });
 
         if (!response.ok) {

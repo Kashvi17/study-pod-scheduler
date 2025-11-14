@@ -13,11 +13,11 @@ const auth = new google.auth.GoogleAuth({
 const calendar = google.calendar({ version: "v3", auth });
 
 // Create a booking
-const createBooking = async (summary, description, startTime, endTime, userEmail) => {
+const createBooking = async (summary, description, startTime, endTime, userEmail, nNumber) => {
   try {
     const event = {
       summary,
-      description: `${description}\n\nBooked by: ${userEmail}`,
+      description: `${description}\n\nBooked by: ${userEmail}\nN Number: ${nNumber}`,
       start: { 
         dateTime: startTime,
         timeZone: "America/New_York"
@@ -28,7 +28,8 @@ const createBooking = async (summary, description, startTime, endTime, userEmail
       },
       extendedProperties: {
         private: {
-          bookedBy: userEmail
+          bookedBy: userEmail,
+          nNumber: nNumber // Store N number for verification
         }
       }
     };
@@ -62,8 +63,8 @@ const getBookings = async (startTime, endTime) => {
   }
 };
 
-// Delete a booking (only if user owns it)
-const deleteBooking = async (eventId, userEmail) => {
+// Delete a booking (only if N number matches)
+const deleteBooking = async (eventId, nNumber) => {
   try {
     // First, get the event to check ownership
     const event = await calendar.events.get({
@@ -71,10 +72,10 @@ const deleteBooking = async (eventId, userEmail) => {
       eventId,
     });
     
-    const bookedBy = event.data.extendedProperties?.private?.bookedBy;
+    const bookedByNNumber = event.data.extendedProperties?.private?.nNumber;
     
-    if (bookedBy !== userEmail) {
-      throw new Error("You can only delete your own bookings");
+    if (bookedByNNumber !== nNumber) {
+      throw new Error("You can only delete your own bookings. N number does not match.");
     }
     
     await calendar.events.delete({ calendarId, eventId });
@@ -86,8 +87,60 @@ const deleteBooking = async (eventId, userEmail) => {
   }
 };
 
+// Check for time slot conflicts
+const checkConflict = async (roomName, startTime, endTime) => {
+  try {
+    const bookings = await getBookings(startTime, endTime);
+    
+    // Check if any booking overlaps with the requested time for the same room
+    const conflict = bookings.find(booking => {
+      const bookingStart = new Date(booking.start.dateTime);
+      const bookingEnd = new Date(booking.end.dateTime);
+      const requestStart = new Date(startTime);
+      const requestEnd = new Date(endTime);
+      
+      // Check if it's the same room and times overlap
+      const isSameRoom = booking.summary.includes(roomName);
+      const overlaps = (requestStart < bookingEnd && requestEnd > bookingStart);
+      
+      return isSameRoom && overlaps;
+    });
+    
+    return conflict;
+  } catch (err) {
+    console.error("❌ Error checking conflicts:", err);
+    throw err;
+  }
+};
+
+// Auto-cancel bookings if no show (15+ minutes past start time)
+const autoCancel NoShows = async () => {
+  try {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    const bookings = await getBookings(oneHourAgo.toISOString(), now.toISOString());
+    
+    for (const booking of bookings) {
+      const start = new Date(booking.start.dateTime);
+      const end = new Date(booking.end.dateTime);
+      const fifteenMinAfterStart = new Date(start.getTime() + 15 * 60 * 1000);
+      
+      // If it's past 15 minutes after start and before end time, cancel it
+      if (now > fifteenMinAfterStart && now < end) {
+        console.log(`Auto-cancelling no-show booking: ${booking.id}`);
+        await calendar.events.delete({ calendarId, eventId: booking.id });
+      }
+    }
+  } catch (err) {
+    console.error("❌ Error auto-cancelling no-shows:", err);
+  }
+};
+
 module.exports = {
   createBooking,
   getBookings,
   deleteBooking,
+  checkConflict,
+  autoCancelNoShows,
 };
