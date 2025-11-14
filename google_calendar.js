@@ -18,11 +18,17 @@ const createBooking = async (summary, description, startTime, endTime, userEmail
     const event = {
       summary,
       description: `${description}\n\nBooked by: ${userEmail}`,
-      start: { dateTime: startTime, timeZone: "America/New_York" },
-      end: { dateTime: endTime, timeZone: "America/New_York" },
+      start: { 
+        dateTime: startTime 
+        // NO timeZone here!
+      },
+      end: { 
+        dateTime: endTime 
+        // NO timeZone here!
+      },
       extendedProperties: {
         private: {
-          bookedBy: userEmail // Store who booked it
+          bookedBy: userEmail
         }
       }
     };
@@ -46,7 +52,6 @@ const getBookings = async (startTime, endTime) => {
       calendarId,
       timeMin: startTime,
       timeMax: endTime,
-      timeZone: "America/New_York",
       orderBy: "startTime",
       singleEvents: true,
     });
